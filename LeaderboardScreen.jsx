@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase, getLeaderboard } from '../lib/supabase'
+import { supabase, getLeaderboard } from '../supabase'
 
 const MEDALS = ['🥇', '🥈', '🥉']
 
