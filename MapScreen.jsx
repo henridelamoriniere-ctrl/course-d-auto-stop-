@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { supabase, upsertLocation, getAllTeams, updateCarCount, setArrivalTime, getRaceConfig } from '../supabase'
+import { supabase, upsertLocation, getAllTeams, updateCarCount, setArrivalTime, getRaceConfig } from './supabase'
 
 export default function MapScreen({ team, onCarCountChange }) {
   const mapRef = useRef(null)
