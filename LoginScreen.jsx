@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getOrCreateTeam, setDepartureTime } from '../lib/supabase'
+import { getOrCreateTeam, setDepartureTime } from '../supabase'
 
 const COLORS = ['#EF9F27','#7F77DD','#1D9E75','#D85A30','#D4537E','#378ADD','#E24B4A','#639922']
 
