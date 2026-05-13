@@ -3,7 +3,7 @@ import {
   getAllChallenges, upsertChallenge, deleteChallenge,
   getAllTeams, getAllCompletions, validateCompletion,
   getRaceConfig, updateRaceConfig, sendMessage, getLeaderboard
-} from '../supabase'
+} from './supabase'
 
 export default function AdminScreen({ onLogout }) {
   const [tab, setTab] = useState('course')
