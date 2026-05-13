@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { supabase, getChallenges, getTeamCompletions, submitChallenge } from '../supabase'
+import { supabase, getChallenges, getTeamCompletions, submitChallenge } from './supabase'
 
 const CATEGORY_ICONS = {
   photo: '📸', vehicule: '🚗', fun: '🎯', bonus: '⭐'
