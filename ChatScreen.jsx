@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { supabase, getMessages, sendMessage } from '../supabase'
+import { supabase, getMessages, sendMessage } from './supabase'
 
 export default function ChatScreen({ team }) {
   const [tab, setTab] = useState('general')
