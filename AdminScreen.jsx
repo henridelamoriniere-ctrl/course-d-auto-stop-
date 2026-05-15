@@ -37,14 +37,14 @@ export default function AdminScreen({ onLogout }) {
   async function handleStartRace() {
     if (!confirm('Lancer la course maintenant ?')) return
     await updateRaceConfig({ status: 'active', started_at: new Date().toISOString() })
-    await sendMessage('Orga 🏁', '#888780', '🚀 La course est officiellement lancée ! Bonne chance à toutes les équipes !', 'announcement')
+    await sendMessage('Orga 🏁', '#4A7C59', '🚀 La course est officiellement lancée ! Bonne chance à toutes les équipes !', 'announcement')
     setConfig(prev => ({ ...prev, status: 'active' }))
   }
 
   async function handleStopRace() {
     if (!confirm('Terminer la course ?')) return
     await updateRaceConfig({ status: 'finished' })
-    await sendMessage('Orga 🏁', '#888780', '🏁 La course est terminée ! Merci à tous les participants !', 'announcement')
+    await sendMessage('Orga 🏁', '#4A7C59', '🏁 La course est terminée ! Bravo à tous les participants !', 'announcement')
     setConfig(prev => ({ ...prev, status: 'finished' }))
   }
 
@@ -73,62 +73,66 @@ export default function AdminScreen({ onLogout }) {
 
   async function handleSendAnnouncement() {
     if (!announcement.trim()) return
-    await sendMessage('Orga 📢', '#888780', announcement.trim(), 'announcement')
+    await sendMessage('Orga 📢', '#4A7C59', announcement.trim(), 'announcement')
     setAnnouncement('')
-    alert('Annonce envoyée !')
+    alert('Annonce envoyée à tous les participants !')
   }
 
-  if (!config) return <div style={{ padding: 20, color: '#888' }}>Chargement...</div>
+  if (!config) return <div style={{ padding: 20, color: '#8B7355', fontWeight: 700 }}>Chargement...</div>
+
+  const tabs = [
+    { id: 'course', label: '⚙️ Course' },
+    { id: 'annonce', label: '📢 Annonce' },
+    { id: 'validation', label: `✅ Validation${pending.length > 0 ? ` (${pending.length})` : ''}` },
+    { id: 'defis', label: '🏆 Défis' },
+    { id: 'equipes', label: '👥 Équipes' },
+  ]
 
   return (
     <>
-      <div className="hdr">
+      <div className="hdr hdr-dark">
         <div>
           <div className="hdr-title">⚙️ Panel Admin</div>
-          <div className="hdr-sub" style={{ color: config.status === 'active' ? '#16a34a' : config.status === 'finished' ? '#dc2626' : '#888' }}>
-            Course : {config.status === 'waiting' ? '⏳ En attente' : config.status === 'active' ? '🟢 En cours' : '🏁 Terminée'}
+          <div className="hdr-sub" style={{ color: config.status === 'active' ? '#7BC67E' : config.status === 'finished' ? '#F5C4B3' : 'rgba(255,255,255,0.6)' }}>
+            {config.status === 'waiting' ? '⏳ En attente' : config.status === 'active' ? '🟢 Course en cours' : '🏁 Terminée'}
           </div>
         </div>
-        <button className="btn-outline" onClick={onLogout} style={{ fontSize: 12 }}>Déconnexion</button>
+        <button className="btn-outline" onClick={onLogout} style={{ fontSize: 12, color: 'white', borderColor: 'rgba(255,255,255,0.3)' }}>
+          Déconnexion
+        </button>
       </div>
 
-      <div className="tab-bar">
-        {[['course','Course'],['defis','Défis'],['validation','Validation'],['equipes','Équipes'],['annonce','Annonce']].map(([k,l]) => (
-          <button key={k} className={`tab-btn ${tab === k ? 'active' : ''}`} onClick={() => setTab(k)}
-            style={{ fontSize: 12, padding: '10px 10px' }}>
-            {l}{k === 'validation' && pending.length > 0 && <span style={{ marginLeft: 4, background: '#EF9F27', color: '#fff', borderRadius: 99, padding: '1px 5px', fontSize: 10 }}>{pending.length}</span>}
+      <div className="admin-tab-bar">
+        {tabs.map(t => (
+          <button key={t.id} className={`tab-btn ${tab === t.id ? 'active' : ''}`}
+            style={{ fontSize: 12, padding: '10px 12px', whiteSpace: 'nowrap' }}
+            onClick={() => setTab(t.id)}>
+            {t.label}
           </button>
         ))}
       </div>
 
       <div className="scroll-content">
 
-        {/* COURSE CONFIG */}
         {tab === 'course' && config && (
           <>
-            <div className="card-white">
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Statut de la course</div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                {config.status === 'waiting' && (
-                  <button className="btn-primary" onClick={handleStartRace} style={{ background: '#16a34a' }}>
-                    🚀 Lancer la course
-                  </button>
-                )}
-                {config.status === 'active' && (
-                  <button className="btn-primary" onClick={handleStopRace} style={{ background: '#dc2626' }}>
-                    🏁 Terminer la course
-                  </button>
-                )}
-                {config.status === 'finished' && (
-                  <div style={{ padding: '10px 14px', background: '#d1fae5', borderRadius: 10, fontSize: 14, color: '#065f46', fontWeight: 500, width: '100%', textAlign: 'center' }}>
-                    Course terminée !
-                  </div>
-                )}
-              </div>
+            <div className="card">
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#2D5016', marginBottom: 12 }}>Statut de la course</div>
+              {config.status === 'waiting' && (
+                <button className="btn-green" onClick={handleStartRace}>🚀 Lancer la course !</button>
+              )}
+              {config.status === 'active' && (
+                <button className="btn-danger" onClick={handleStopRace} style={{ width: '100%', padding: 12, fontSize: 14 }}>🏁 Terminer la course</button>
+              )}
+              {config.status === 'finished' && (
+                <div style={{ padding: 14, background: '#E0F8E0', borderRadius: 12, textAlign: 'center', fontSize: 14, fontWeight: 800, color: '#1A4A1F' }}>
+                  Course terminée ! 🎉
+                </div>
+              )}
             </div>
 
-            <div className="card-white">
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Point de départ</div>
+            <div className="card">
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#2D5016', marginBottom: 12 }}>🚩 Point de départ</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <input value={config.start_location_name} onChange={e => setConfig(p => ({ ...p, start_location_name: e.target.value }))} placeholder="Nom du départ" />
                 <div className="grid-2">
@@ -138,8 +142,8 @@ export default function AdminScreen({ onLogout }) {
               </div>
             </div>
 
-            <div className="card-white">
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Point d'arrivée</div>
+            <div className="card">
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#2D5016', marginBottom: 12 }}>🏁 Point d'arrivée</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <input value={config.end_location_name} onChange={e => setConfig(p => ({ ...p, end_location_name: e.target.value }))} placeholder="Nom de l'arrivée" />
                 <div className="grid-2">
@@ -149,36 +153,90 @@ export default function AdminScreen({ onLogout }) {
               </div>
             </div>
 
-            <div className="card-white">
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Mot de passe admin</div>
-              <input value={config.admin_password} onChange={e => setConfig(p => ({ ...p, admin_password: e.target.value }))} type="text" placeholder="Mot de passe admin" />
+            <div className="card">
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#2D5016', marginBottom: 8 }}>🔐 Mot de passe admin</div>
+              <input value={config.admin_password} onChange={e => setConfig(p => ({ ...p, admin_password: e.target.value }))} type="text" />
             </div>
 
             <button className="btn-primary" onClick={handleSaveConfig} disabled={saving}>
-              {saving ? 'Sauvegarde...' : 'Sauvegarder la configuration'}
+              {saving ? 'Sauvegarde...' : '💾 Sauvegarder la configuration'}
             </button>
           </>
         )}
 
-        {/* DÉFIS */}
+        {tab === 'annonce' && (
+          <div className="card">
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#2D5016', marginBottom: 12 }}>
+              📢 Envoyer une annonce à tous les participants
+            </div>
+            <p style={{ fontSize: 12, color: '#8B7355', fontWeight: 600, marginBottom: 12, lineHeight: 1.5 }}>
+              L'annonce apparaîtra dans le chat "Annonces" de tous les participants en temps réel.
+            </p>
+            <textarea
+              value={announcement}
+              onChange={e => setAnnouncement(e.target.value)}
+              placeholder="Ex : ⚡ Défi surprise ! Les 3 premières équipes à envoyer une photo avec un élu local gagnent 50 pts bonus !"
+              rows={4}
+              style={{ resize: 'vertical', marginBottom: 12, lineHeight: 1.5 }}
+            />
+            <button className="btn-primary" onClick={handleSendAnnouncement} disabled={!announcement.trim()}>
+              📢 Envoyer l'annonce à tous !
+            </button>
+          </div>
+        )}
+
+        {tab === 'validation' && (
+          <>
+            {pending.length === 0 && (
+              <div style={{ textAlign: 'center', color: '#B4A090', padding: 40, fontSize: 14, fontWeight: 700 }}>
+                ✅ Aucune validation en attente !
+              </div>
+            )}
+            {pending.map(comp => (
+              <div key={comp.id} className="card">
+                <div style={{ marginBottom: 10 }}>
+                  <p style={{ fontSize: 14, fontWeight: 800, color: '#2D5016' }}>{comp.challenges?.title}</p>
+                  <p style={{ fontSize: 12, color: '#8B7355', fontWeight: 600, marginTop: 2 }}>
+                    👥 {comp.teams?.name} · {new Date(comp.submitted_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+                {comp.proof_url && (
+                  <img src={comp.proof_url} alt="Preuve"
+                    style={{ width: '100%', borderRadius: 12, marginBottom: 12, objectFit: 'cover', maxHeight: 250, border: '2px solid #E8D5B0', cursor: 'pointer' }}
+                    onClick={() => window.open(comp.proof_url, '_blank')} />
+                )}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button className="btn-green" onClick={() => handleValidate(comp.id, true)} style={{ flex: 1, padding: 12, fontSize: 14 }}>
+                    ✅ Valider
+                  </button>
+                  <button className="btn-danger" onClick={() => handleValidate(comp.id, false)} style={{ flex: 1, padding: 12, fontSize: 14 }}>
+                    ❌ Refuser
+                  </button>
+                </div>
+              </div>
+            ))}
+          </>
+        )}
+
         {tab === 'defis' && (
           <>
-            <button className="btn-primary"
-              onClick={() => setEditingChallenge({ title: '', description: '', points: 50, category: 'fun', proof_type: 'photo', validation_type: 'auto', active: true, sort_order: challenges.length })}>
+            <button className="btn-primary" onClick={() => setEditingChallenge({ title: '', description: '', points: 20, category: 'fun', proof_type: 'photo', validation_type: 'manual', active: true, sort_order: challenges.length })}>
               + Nouveau défi
             </button>
 
             {editingChallenge && (
-              <div className="card-white">
-                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>{editingChallenge.id ? 'Modifier' : 'Nouveau défi'}</div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div className="card">
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#2D5016', marginBottom: 12 }}>
+                  {editingChallenge.id ? 'Modifier le défi' : 'Nouveau défi'}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <input value={editingChallenge.title} onChange={e => setEditingChallenge(p => ({ ...p, title: e.target.value }))} placeholder="Titre du défi *" />
                   <input value={editingChallenge.description} onChange={e => setEditingChallenge(p => ({ ...p, description: e.target.value }))} placeholder="Description / règle" />
                   <div className="grid-2">
                     <input type="number" value={editingChallenge.points} onChange={e => setEditingChallenge(p => ({ ...p, points: parseInt(e.target.value) }))} placeholder="Points" />
                     <select value={editingChallenge.category} onChange={e => setEditingChallenge(p => ({ ...p, category: e.target.value }))}>
-                      <option value="photo">Photo</option>
-                      <option value="vehicule">Véhicule</option>
+                      <option value="rencontres">Rencontres</option>
+                      <option value="vehicules">Véhicules</option>
                       <option value="fun">Fun</option>
                       <option value="bonus">Bonus</option>
                     </select>
@@ -190,8 +248,7 @@ export default function AdminScreen({ onLogout }) {
                     </select>
                     <select value={editingChallenge.proof_type} onChange={e => setEditingChallenge(p => ({ ...p, proof_type: e.target.value }))}>
                       <option value="photo">Photo</option>
-                      <option value="video">Vidéo</option>
-                      <option value="both">Photo ou vidéo</option>
+                      <option value="video">Vidéo (WhatsApp)</option>
                     </select>
                   </div>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -203,25 +260,25 @@ export default function AdminScreen({ onLogout }) {
             )}
 
             {challenges.map(ch => (
-              <div key={ch.id} className="card-white">
+              <div key={ch.id} className="card" style={{ opacity: ch.active ? 1 : 0.5 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                      <p style={{ fontSize: 14, fontWeight: 600, color: ch.active ? '#1a1a1a' : '#aaa', textDecoration: ch.active ? 'none' : 'line-through' }}>{ch.title}</p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <p style={{ fontSize: 14, fontWeight: 800, color: ch.active ? '#2D5016' : '#8B7355' }}>{ch.title}</p>
                       <span className="pill pill-amber">{ch.points} pts</span>
                     </div>
-                    {ch.description && <p style={{ fontSize: 12, color: '#888' }}>{ch.description}</p>}
+                    {ch.description && <p style={{ fontSize: 12, color: '#8B7355', fontWeight: 600 }}>{ch.description}</p>}
                     <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                      <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 99, background: '#f3f4f6', color: '#6b7280' }}>{ch.category}</span>
-                      <span style={{ fontSize: 11, padding: '2px 6px', borderRadius: 99, background: ch.validation_type === 'auto' ? '#d1fae5' : '#fef3e2', color: ch.validation_type === 'auto' ? '#065f46' : '#92400e' }}>{ch.validation_type}</span>
+                      <span className="pill pill-gray" style={{ fontSize: 11 }}>{ch.category}</span>
+                      <span className={`pill ${ch.validation_type === 'auto' ? 'pill-green' : 'pill-orange'}`} style={{ fontSize: 11 }}>{ch.validation_type}</span>
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                    <button className="btn-outline" style={{ fontSize: 12, padding: '6px 10px' }} onClick={() => setEditingChallenge(ch)}>Éditer</button>
-                    <button className="btn-outline" style={{ fontSize: 12, padding: '6px 10px', color: ch.active ? '#888' : '#16a34a' }} onClick={() => handleToggleChallenge(ch)}>
-                      {ch.active ? 'Désactiver' : 'Activer'}
+                    <button className="btn-outline" style={{ fontSize: 11, padding: '5px 8px' }} onClick={() => setEditingChallenge(ch)}>Éditer</button>
+                    <button className="btn-outline" style={{ fontSize: 11, padding: '5px 8px', color: ch.active ? '#D85A30' : '#4A7C59', borderColor: ch.active ? '#F5C4B3' : '#A8D5B5' }} onClick={() => handleToggleChallenge(ch)}>
+                      {ch.active ? 'OFF' : 'ON'}
                     </button>
-                    <button className="btn-danger" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => handleDeleteChallenge(ch.id)}>✕</button>
+                    <button className="btn-danger" style={{ padding: '5px 8px', fontSize: 11 }} onClick={() => handleDeleteChallenge(ch.id)}>✕</button>
                   </div>
                 </div>
               </div>
@@ -229,77 +286,28 @@ export default function AdminScreen({ onLogout }) {
           </>
         )}
 
-        {/* VALIDATION */}
-        {tab === 'validation' && (
-          <>
-            {pending.length === 0 && (
-              <div style={{ textAlign: 'center', color: '#bbb', padding: 40, fontSize: 14 }}>
-                Aucune validation en attente ✓
-              </div>
-            )}
-            {pending.map(comp => (
-              <div key={comp.id} className="card-white">
-                <div style={{ marginBottom: 8 }}>
-                  <p style={{ fontSize: 14, fontWeight: 600 }}>{comp.challenges?.title}</p>
-                  <p style={{ fontSize: 12, color: '#888', marginTop: 2 }}>
-                    {comp.teams?.name} · {new Date(comp.submitted_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-                {comp.proof_url && (
-                  <div style={{ marginBottom: 10 }}>
-                    {comp.proof_type === 'video'
-                      ? <video src={comp.proof_url} controls style={{ width: '100%', borderRadius: 8, maxHeight: 200 }} />
-                      : <img src={comp.proof_url} alt="Preuve" style={{ width: '100%', borderRadius: 8, maxHeight: 200, objectFit: 'cover' }} />
-                    }
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button className="btn-primary" onClick={() => handleValidate(comp.id, true)} style={{ background: '#16a34a' }}>✓ Valider</button>
-                  <button className="btn-primary" onClick={() => handleValidate(comp.id, false)} style={{ background: '#dc2626' }}>✗ Refuser</button>
-                </div>
-              </div>
-            ))}
-          </>
-        )}
-
-        {/* ÉQUIPES */}
         {tab === 'equipes' && (
           <>
-            <div className="card" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 28, fontWeight: 700 }}>{teams.length}</div>
-              <div style={{ fontSize: 13, color: '#888' }}>équipes inscrites</div>
+            <div className="card-dark" style={{ textAlign: 'center', padding: 16 }}>
+              <div style={{ fontSize: 32, fontWeight: 800, color: '#F4A435' }}>{teams.length}</div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', fontWeight: 700 }}>équipes inscrites</div>
             </div>
             {teams.map(t => (
-              <div key={t.id} className="card-white" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div className="team-avatar" style={{ background: t.color }}>{t.name[0].toUpperCase()}</div>
+              <div key={t.id} className="card" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: t.color, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: 18, flexShrink: 0 }}>
+                  {t.name[0].toUpperCase()}
+                </div>
                 <div style={{ flex: 1 }}>
-                  <p style={{ fontSize: 14, fontWeight: 600 }}>{t.name}</p>
-                  <p style={{ fontSize: 12, color: '#888' }}>
-                    {t.car_count} voitures
+                  <p style={{ fontSize: 14, fontWeight: 800, color: '#2D5016' }}>{t.name}</p>
+                  <p style={{ fontSize: 12, color: '#8B7355', fontWeight: 600, marginTop: 2 }}>
+                    🚗 {t.car_count} voitures
                     {t.departure_time && ` · Départ ${new Date(t.departure_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
-                    {t.arrival_time && <span style={{ color: '#16a34a', fontWeight: 600 }}> · Arrivée {new Date(t.arrival_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>}
+                    {t.arrival_time && <span style={{ color: '#2D5016', fontWeight: 800 }}> · 🏁 Arrivée {new Date(t.arrival_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>}
                   </p>
                 </div>
               </div>
             ))}
           </>
-        )}
-
-        {/* ANNONCES */}
-        {tab === 'annonce' && (
-          <div className="card-white">
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>📢 Envoyer une annonce à tous</div>
-            <textarea
-              value={announcement}
-              onChange={e => setAnnouncement(e.target.value)}
-              placeholder="Ex: Checkpoint 2 actif ! Rendez-vous à Mâcon..."
-              rows={4}
-              style={{ resize: 'vertical', marginBottom: 10 }}
-            />
-            <button className="btn-primary" onClick={handleSendAnnouncement}>
-              Envoyer l'annonce 📢
-            </button>
-          </div>
         )}
 
       </div>
