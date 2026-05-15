@@ -97,7 +97,9 @@ if (checking) return <div className="app" style={{display:'flex',alignItems:'cen
           </div>
         </>
       )}
-
+<div style={{ textAlign: 'center', padding: '6px 16px', background: '#F4A435', color: 'white', fontSize: 13, fontWeight: 800, letterSpacing: '0.3px', flexShrink: 0 }}>
+  🌻 Ça va pas être triste !
+</div>
       <BottomNav current={screen} onChange={setScreen} isAdmin={isAdmin} />
 
       {showAdminLogin && (
