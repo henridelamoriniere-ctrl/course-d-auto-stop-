@@ -15,6 +15,8 @@ export default function AdminScreen({ onLogout }) {
   const [announcement, setAnnouncement] = useState('')
   const [saving, setSaving] = useState(false)
   const [resetting, setResetting] = useState(false)
+  const [confirmModal, setConfirmModal] = useState(null)
+  const [confirmInput, setConfirmInput] = useState('')
 
   useEffect(() => { loadAll() }, [])
 
@@ -35,38 +37,73 @@ export default function AdminScreen({ onLogout }) {
     alert('Configuration sauvegardée !')
   }
 
-  async function handleStartRace() {
-    if (!confirm('Lancer la course maintenant ?')) return
-    await updateRaceConfig({ status: 'active', started_at: new Date().toISOString() })
-    await sendMessage('Orga 🏁', '#4A7C59', '🚀 La course est officiellement lancée ! Bonne chance à toutes les équipes !', 'announcement')
-    setConfig(prev => ({ ...prev, status: 'active' }))
+  function handleStartRace() {
+    setConfirmInput('')
+    setConfirmModal({
+      type: 'start',
+      title: '🚀 Lancer la course',
+      message: 'Cette action va démarrer officiellement la course pour tous les participants. Une annonce sera envoyée automatiquement.',
+      code: 'LANCER',
+      color: '#4A7C59',
+      bg: '#E0F8E0',
+      buttonLabel: '🚀 Lancer la course !',
+    })
   }
 
-  async function handleStopRace() {
-    if (!confirm('Terminer la course ?')) return
-    await updateRaceConfig({ status: 'finished' })
-    await sendMessage('Orga 🏁', '#4A7C59', '🏁 La course est terminée ! Bravo à tous les participants !', 'announcement')
-    setConfig(prev => ({ ...prev, status: 'finished' }))
+  function handleStopRace() {
+    setConfirmInput('')
+    setConfirmModal({
+      type: 'stop',
+      title: '🏁 Terminer la course',
+      message: 'Cette action va terminer officiellement la course. Une annonce de fin sera envoyée à tous les participants.',
+      code: 'TERMINER',
+      color: '#D85A30',
+      bg: '#FDECEA',
+      buttonLabel: '🏁 Terminer la course',
+    })
   }
 
-  async function handleResetAll() {
-    if (!confirm('⚠️ ATTENTION ! Remettre à zéro TOUTES les données ?\n\nÉquipes, photos, messages, positions GPS...\n\nCette action est IRRÉVERSIBLE !')) return
-    if (!confirm('Dernière confirmation : effacer toutes les données de la course ?')) return
-    setResetting(true)
-    try {
-      await supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('challenge_completions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('team_locations').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('teams').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await updateRaceConfig({ status: 'waiting', started_at: null })
-      setConfig(prev => ({ ...prev, status: 'waiting', started_at: null }))
-      setTeams([])
-      setPending([])
-      alert('✅ App remise à zéro ! Tout est prêt pour une nouvelle course.')
-    } catch (e) {
-      alert('Erreur lors de la remise à zéro. Réessaie.')
+  function handleResetAll() {
+    setConfirmInput('')
+    setConfirmModal({
+      type: 'reset',
+      title: '🗑️ Remettre à zéro',
+      message: '⚠️ ATTENTION ! Toutes les équipes, photos, messages et positions GPS seront effacés définitivement. Cette action est IRRÉVERSIBLE.',
+      code: 'RESET',
+      color: '#993C1D',
+      bg: '#FDECEA',
+      buttonLabel: '🗑️ Tout effacer définitivement',
+    })
+  }
+
+  async function executeConfirmedAction() {
+    const type = confirmModal.type
+    if (type === 'start') {
+      await updateRaceConfig({ status: 'active', started_at: new Date().toISOString() })
+      await sendMessage('Orga 🏁', '#4A7C59', '🚀 La course est officiellement lancée ! Bonne chance à toutes les équipes !', 'announcement')
+      setConfig(prev => ({ ...prev, status: 'active' }))
+    } else if (type === 'stop') {
+      await updateRaceConfig({ status: 'finished' })
+      await sendMessage('Orga 🏁', '#4A7C59', '🏁 La course est terminée ! Bravo à tous les participants !', 'announcement')
+      setConfig(prev => ({ ...prev, status: 'finished' }))
+    } else if (type === 'reset') {
+      setResetting(true)
+      try {
+        await supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        await supabase.from('challenge_completions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        await supabase.from('team_locations').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        await supabase.from('teams').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+        await updateRaceConfig({ status: 'waiting', started_at: null })
+        setConfig(prev => ({ ...prev, status: 'waiting', started_at: null }))
+        setTeams([])
+        setPending([])
+      } catch (e) {
+        alert('Erreur lors de la remise à zéro. Réessaie.')
+      }
+      setResetting(false)
     }
-    setResetting(false)
+    setConfirmModal(null)
+    setConfirmInput('')
   }
 
   async function handleValidate(id, approved) {
@@ -109,6 +146,8 @@ export default function AdminScreen({ onLogout }) {
     { id: 'equipes', label: '👥 Équipes' },
   ]
 
+  const codeOk = confirmModal && confirmInput.trim().toUpperCase() === confirmModal.code
+
   return (
     <>
       <div className="hdr hdr-dark">
@@ -143,7 +182,7 @@ export default function AdminScreen({ onLogout }) {
                 <button className="btn-green" onClick={handleStartRace}>🚀 Lancer la course !</button>
               )}
               {config.status === 'active' && (
-                <button style={{ width: '100%', padding: 12, fontSize: 14, background: '#FDECEA', color: '#D85A30', border: '2px solid #F5C4B3', borderRadius: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }} onClick={handleStopRace}>
+                <button onClick={handleStopRace} style={{ width: '100%', padding: 12, fontSize: 14, background: '#FDECEA', color: '#D85A30', border: '2px solid #F5C4B3', borderRadius: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
                   🏁 Terminer la course
                 </button>
               )}
@@ -190,11 +229,9 @@ export default function AdminScreen({ onLogout }) {
               <p style={{ fontSize: 12, color: '#D85A30', fontWeight: 600, marginBottom: 12, lineHeight: 1.5 }}>
                 Remet l'app à zéro : supprime toutes les équipes, messages, photos et positions GPS. À utiliser avant le jour J pour repartir de zéro.
               </p>
-              <button
-                onClick={handleResetAll}
-                disabled={resetting}
+              <button onClick={handleResetAll} disabled={resetting}
                 style={{ width: '100%', padding: 12, background: '#D85A30', color: 'white', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
-                {resetting ? '⏳ Remise à zéro...' : '🗑️ Remettre l\'app à zéro'}
+                {resetting ? '⏳ Remise à zéro...' : "🗑️ Remettre l'app à zéro"}
               </button>
             </div>
           </>
@@ -245,7 +282,7 @@ export default function AdminScreen({ onLogout }) {
                   <button className="btn-green" onClick={() => handleValidate(comp.id, true)} style={{ flex: 1, padding: 12, fontSize: 14 }}>
                     ✅ Valider
                   </button>
-                  <button style={{ flex: 1, padding: 12, fontSize: 14, background: '#FDECEA', color: '#D85A30', border: '2px solid #F5C4B3', borderRadius: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }} onClick={() => handleValidate(comp.id, false)}>
+                  <button onClick={() => handleValidate(comp.id, false)} style={{ flex: 1, padding: 12, fontSize: 14, background: '#FDECEA', color: '#D85A30', border: '2px solid #F5C4B3', borderRadius: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
                     ❌ Refuser
                   </button>
                 </div>
@@ -314,7 +351,7 @@ export default function AdminScreen({ onLogout }) {
                     <button className="btn-outline" style={{ fontSize: 11, padding: '5px 8px', color: ch.active ? '#D85A30' : '#4A7C59', borderColor: ch.active ? '#F5C4B3' : '#A8D5B5' }} onClick={() => handleToggleChallenge(ch)}>
                       {ch.active ? 'OFF' : 'ON'}
                     </button>
-                    <button style={{ padding: '5px 8px', fontSize: 11, background: '#FDECEA', color: '#D85A30', border: '2px solid #F5C4B3', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }} onClick={() => handleDeleteChallenge(ch.id)}>✕</button>
+                    <button onClick={() => handleDeleteChallenge(ch.id)} style={{ padding: '5px 8px', fontSize: 11, background: '#FDECEA', color: '#D85A30', border: '2px solid #F5C4B3', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }}>✕</button>
                   </div>
                 </div>
               </div>
@@ -347,6 +384,67 @@ export default function AdminScreen({ onLogout }) {
         )}
 
       </div>
+
+      {/* MODAL DE CONFIRMATION SÉCURISÉE */}
+      {confirmModal && (
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24, zIndex: 9999
+        }}>
+          <div style={{
+            background: '#FFFDF8', borderRadius: 20, padding: 24,
+            width: '100%', maxWidth: 340,
+            border: `3px solid ${confirmModal.color}`
+          }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, color: confirmModal.color }}>
+              {confirmModal.title}
+            </h3>
+            <p style={{ fontSize: 13, color: '#5A7040', fontWeight: 600, marginBottom: 16, lineHeight: 1.6 }}>
+              {confirmModal.message}
+            </p>
+
+            <div style={{ background: confirmModal.bg, border: `2px solid ${confirmModal.color}`, borderRadius: 12, padding: 14, marginBottom: 16, textAlign: 'center' }}>
+              <p style={{ fontSize: 12, color: confirmModal.color, fontWeight: 700, marginBottom: 6 }}>
+                Pour confirmer, tape exactement ce mot :
+              </p>
+              <p style={{ fontSize: 28, fontWeight: 800, color: confirmModal.color, letterSpacing: 4 }}>
+                {confirmModal.code}
+              </p>
+            </div>
+
+            <input
+              type="text"
+              value={confirmInput}
+              onChange={e => setConfirmInput(e.target.value)}
+              placeholder={`Tape ${confirmModal.code} ici...`}
+              style={{ marginBottom: 12, textAlign: 'center', fontSize: 16, fontWeight: 800, letterSpacing: 2, borderColor: codeOk ? confirmModal.color : undefined }}
+              autoFocus
+            />
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={executeConfirmedAction}
+                disabled={!codeOk || resetting}
+                style={{
+                  flex: 1, padding: 12, fontSize: 14, fontWeight: 800,
+                  background: codeOk ? confirmModal.color : '#E8D5B0',
+                  color: codeOk ? 'white' : '#B4A090',
+                  border: 'none', borderRadius: 12, cursor: codeOk ? 'pointer' : 'not-allowed',
+                  fontFamily: 'Nunito, sans-serif', transition: 'all 0.2s'
+                }}>
+                {resetting ? '⏳ En cours...' : confirmModal.buttonLabel}
+              </button>
+              <button className="btn-outline"
+                onClick={() => { setConfirmModal(null); setConfirmInput('') }}
+                style={{ padding: '12px 16px' }}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
