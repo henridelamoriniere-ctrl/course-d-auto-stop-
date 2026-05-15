@@ -78,7 +78,6 @@ export default function MapScreen({ team, onOpenAdmin }) {
     const { data: locs } = await supabase.from('team_locations').select('*')
     const locMap = {}
     if (locs) locs.forEach(l => { locMap[l.team_id] = l })
-
     teams.forEach(t => {
       const loc = locMap[t.id]
       if (!loc) return
@@ -151,7 +150,7 @@ export default function MapScreen({ team, onOpenAdmin }) {
     await updateCarCount(teamRef.current.id, newCount)
   }
 
- async function handleArrival() {
+  async function handleArrival() {
     const arrivalTime = new Date().toISOString()
     await setArrivalTime(teamRef.current.id)
     team.arrival_time = arrivalTime
@@ -243,6 +242,18 @@ export default function MapScreen({ team, onOpenAdmin }) {
           </div>
         </div>
 
+        {config && (
+          <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 11, color: '#8B7355', fontWeight: 800, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏁 Destination</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#2D5016' }}>{config.end_location_name}</div>
+            </div>
+            <a href={`https://www.google.com/maps/dir/?api=1&destination=${config.end_lat},${config.end_lng}`} target="_blank" rel="noreferrer" style={{ background: '#4A7C59', color: 'white', padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+              Google Maps →
+            </a>
+          </div>
+        )}
+
         {!arrived && started && (
           <button className="btn-dark" onClick={() => setShowArrivalConfirm(true)}>
             🏁 Je suis arrivé(e) !
@@ -259,33 +270,6 @@ export default function MapScreen({ team, onOpenAdmin }) {
             <button className="btn-outline" onClick={handleCancelArrival} style={{ fontSize: 13 }}>↩ Annuler l'arrivée (erreur ?)</button>
           </div>
         )}
-
-        {config && (
-  <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-    <div>
-      <div style={{ fontSize: 11, color: '#8B7355', fontWeight: 800, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏁 Destination</div>
-      <div style={{ fontSize: 15, fontWeight: 800, color: '#2D5016' }}>{config.end_location_name}</div>
-    </div>
-    
-      href={`https://www.google.com/maps/dir/?api=1&destination=${config.end_lat},${config.end_lng}`}
-      target="_blank"
-      rel="noreferrer"
-      style={{ background: '#4A7C59', color: 'white', padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-      Google Maps →
-    </a>
-  </div>
-)}
-        {config && (
-  <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-    <div>
-      <div style={{ fontSize: 11, color: '#8B7355', fontWeight: 800, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏁 Destination</div>
-      <div style={{ fontSize: 15, fontWeight: 800, color: '#2D5016' }}>{config.end_location_name}</div>
-    </div>
-    <a href={`https://www.google.com/maps/dir/?api=1&destination=${config.end_lat},${config.end_lng}`} target="_blank" rel="noreferrer" style={{ background: '#4A7C59', color: 'white', padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
-      Google Maps →
-    </a>
-  </div>
-)}
 
         {myPos && (
           <p style={{ fontSize: 11, color: '#B4A090', textAlign: 'center', fontWeight: 600 }}>
