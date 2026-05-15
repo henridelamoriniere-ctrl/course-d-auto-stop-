@@ -87,9 +87,18 @@ export default function App() {
       <BottomNav current={screen} onChange={setScreen} isAdmin={isAdmin} />
 
       {showAdminLogin && (
-        <div className="modal-overlay">
-          <div className="modal-box">
-            <h3>⚙️ Accès organisateur</h3>
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 24, zIndex: 9999
+        }}>
+          <div style={{
+            background: '#FFFDF8', borderRadius: 20, padding: 24,
+            width: '100%', maxWidth: 340, border: '3px solid #F4A435'
+          }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 6, color: '#2D5016' }}>⚙️ Accès organisateur</h3>
+            <p style={{ fontSize: 13, color: '#8B7355', fontWeight: 600, marginBottom: 16 }}>Entre le mot de passe pour accéder au panel admin.</p>
             <input
               type="password" value={adminInput}
               onChange={e => setAdminInput(e.target.value)}
@@ -108,3 +117,4 @@ export default function App() {
     </div>
   )
 }
+
