@@ -26,16 +26,25 @@ export default function App() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(teamData))
   }
 
-  function handleAdminLogin(inputPassword) {
+  function handleOpenAdmin() {
+    if (isAdmin) {
+      setScreen('admin')
+    } else {
+      setShowAdminLogin(true)
+    }
+  }
+
+  function handleAdminLogin() {
     getRaceConfig().then(config => {
-      if (inputPassword === config?.admin_password) {
+      if (adminInput === config?.admin_password) {
         setIsAdmin(true)
         setShowAdminLogin(false)
         setAdminError('')
+        setAdminInput('')
         localStorage.setItem(ADMIN_STORAGE_KEY, 'true')
         setScreen('admin')
       } else {
-        setAdminError('Mot de passe incorrect')
+        setAdminError('Mot de passe incorrect !')
       }
     })
   }
@@ -46,35 +55,10 @@ export default function App() {
     setScreen('map')
   }
 
-  const [titleTaps, setTitleTaps] = useState(0)
-  function handleTitleTap() {
-    const next = titleTaps + 1
-    setTitleTaps(next)
-    if (next >= 5) { setShowAdminLogin(true); setTitleTaps(0) }
-    setTimeout(() => setTitleTaps(0), 3000)
-  }
-
   if (!team) {
     return (
       <div className="app">
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid #f0ede8', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <span style={{ fontSize: 20 }}>🚗</span>
-          <span style={{ fontSize: 17, fontWeight: 700 }} onClick={handleTitleTap}>HitchRace</span>
-        </div>
         <LoginScreen onLogin={handleLogin} />
-        {showAdminLogin && (
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 100 }}>
-            <div style={{ background: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 320 }}>
-              <p style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>⚙️ Accès organisateur</p>
-              <input type="password" value={adminInput} onChange={e => setAdminInput(e.target.value)} placeholder="Mot de passe admin" style={{ marginBottom: 8 }} onKeyDown={e => e.key === 'Enter' && handleAdminLogin(adminInput)} autoFocus />
-              {adminError && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 8 }}>{adminError}</p>}
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn-primary" onClick={() => handleAdminLogin(adminInput)}>Connexion</button>
-                <button className="btn-outline" onClick={() => { setShowAdminLogin(false); setAdminInput(''); setAdminError('') }}>Annuler</button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     )
   }
@@ -86,7 +70,7 @@ export default function App() {
       ) : (
         <>
           <div className={`screen ${screen === 'map' ? 'active' : ''}`}>
-            <MapScreen team={team} />
+            <MapScreen team={team} onOpenAdmin={handleOpenAdmin} />
           </div>
           <div className={`screen ${screen === 'challenges' ? 'active' : ''}`}>
             <ChallengesScreen team={team} />
@@ -99,12 +83,27 @@ export default function App() {
           </div>
         </>
       )}
-      <BottomNav current={screen} onChange={setScreen} />
-      {isAdmin && screen !== 'admin' && (
-        <button onClick={() => setScreen('admin')}
-          style={{ position: 'absolute', top: 14, right: 16, background: '#fef3e2', color: '#b45309', border: 'none', borderRadius: 8, padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontWeight: 600, zIndex: 50 }}>
-          ⚙️ Admin
-        </button>
+
+      <BottomNav current={screen} onChange={setScreen} isAdmin={isAdmin} />
+
+      {showAdminLogin && (
+        <div className="modal-overlay">
+          <div className="modal-box">
+            <h3>⚙️ Accès organisateur</h3>
+            <input
+              type="password" value={adminInput}
+              onChange={e => setAdminInput(e.target.value)}
+              placeholder="Mot de passe"
+              onKeyDown={e => e.key === 'Enter' && handleAdminLogin()}
+              autoFocus style={{ marginBottom: 10 }}
+            />
+            {adminError && <p style={{ color: '#D85A30', fontSize: 13, fontWeight: 700, marginBottom: 10 }}>{adminError}</p>}
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn-primary" onClick={handleAdminLogin}>Connexion</button>
+              <button className="btn-outline" onClick={() => { setShowAdminLogin(false); setAdminInput(''); setAdminError('') }}>Annuler</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
