@@ -1,4 +1,4 @@
-export default function BottomNav({ current, onChange }) {
+export default function BottomNav({ current, onChange, isAdmin }) {
   const items = [
     { id: 'map', label: 'Carte', icon: (
       <svg viewBox="0 0 24 24"><path d="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7m0 13V7m0 13 6 3m-6-3V7m6 16 5.447-2.724A1 1 0 0 0 21 19.382V8.618a1 1 0 0 0-1.447-.894L15 10m0 13V10m0 0L9 7"/></svg>
