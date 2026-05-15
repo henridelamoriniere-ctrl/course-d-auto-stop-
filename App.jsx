@@ -12,9 +12,22 @@ const STORAGE_KEY = 'hitchrace_team'
 const ADMIN_STORAGE_KEY = 'hitchrace_admin'
 
 export default function App() {
-  const [team, setTeam] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) } catch { return null }
-  })
+ const [team, setTeam] = useState(null)
+  const [checking, setChecking] = useState(true)
+
+  useEffect(() => {
+    async function checkTeam() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY))
+        if (saved) {
+          const { data } = await supabase.from('teams').select('*').eq('id', saved.id).single()
+          if (data) { setTeam(data) } else { localStorage.removeItem(STORAGE_KEY) }
+        }
+      } catch {}
+      setChecking(false)
+    }
+    checkTeam()
+  }, [])
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem(ADMIN_STORAGE_KEY) === 'true')
   const [screen, setScreen] = useState('map')
   const [showAdminLogin, setShowAdminLogin] = useState(false)
