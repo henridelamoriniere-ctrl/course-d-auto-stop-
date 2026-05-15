@@ -121,7 +121,7 @@ export default function ChallengesScreen({ team }) {
         <span className="pill pill-amber" style={{ fontSize: 14, fontWeight: 800 }}>{totalPts} pts</span>
       </div>
 
-      <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} accept="image/*" capture="environment" />
+      <input type="file" ref={fileInputRef} style={{ display: 'none' }} onChange={handleFileChange} accept="image/*"  />
 
       <div className="scroll-content">
         {catOrder.filter(cat => grouped[cat]).map(cat => (
