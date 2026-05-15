@@ -51,8 +51,15 @@ export default function MapScreen({ team, onOpenAdmin }) {
     return () => clearInterval(timerRef.current)
   }, [departureTime])
 
-  // Load config
-  useEffect(() => { getRaceConfig().then(setConfig) }, [])
+  // Load config + realtime update when admin changes race status
+  useEffect(() => {
+    getRaceConfig().then(setConfig)
+    const channel = supabase.channel('race-config-watch')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'race_config' },
+        payload => setConfig(payload.new))
+      .subscribe()
+    return () => supabase.removeChannel(channel)
+  }, [])
 
   // Init map
   useEffect(() => {
@@ -60,11 +67,9 @@ export default function MapScreen({ team, onOpenAdmin }) {
     import('leaflet').then(L => {
       const map = L.default.map(mapRef.current, { zoomControl: true })
         .setView([47.5, 2.0], 7)
-
       L.default.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
       }).addTo(map)
-
       mapInstanceRef.current = map
       loadAllMarkers(L.default, map)
     })
@@ -76,7 +81,6 @@ export default function MapScreen({ team, onOpenAdmin }) {
     const locMap = {}
     if (locs) locs.forEach(l => { locMap[l.team_id] = l })
 
-    // Start/end pins
     if (config) {
       const startIcon = L.divIcon({
         html: `<div style="background:#2D5016;color:white;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:800;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.2)">🚩 ${config.start_location_name}</div>`,
@@ -128,7 +132,7 @@ export default function MapScreen({ team, onOpenAdmin }) {
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current) }
   }, [team.id])
 
-  // Realtime other teams
+  // Realtime other teams positions
   useEffect(() => {
     const channel = supabase.channel('map-locations')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'team_locations' },
@@ -147,9 +151,9 @@ export default function MapScreen({ team, onOpenAdmin }) {
   }, [team.id])
 
   async function handleStart() {
-    const now = new Date().toISOString()
+    const t = new Date().toISOString()
     await setDepartureTime(team.id)
-    setDepTime(now)
+    setDepTime(t)
     setStarted(true)
   }
 
@@ -169,6 +173,10 @@ export default function MapScreen({ team, onOpenAdmin }) {
     await supabase.from('teams').update({ arrival_time: null }).eq('id', team.id)
     setArrived(false)
   }
+
+  const raceActive = config?.status === 'active'
+  const raceWaiting = config?.status === 'waiting' || !config?.status
+  const raceFinished = config?.status === 'finished'
 
   const depTimeStr = departureTime
     ? new Date(departureTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -197,11 +205,30 @@ export default function MapScreen({ team, onOpenAdmin }) {
       <div id="map" ref={mapRef} style={{ height: 240 }} />
 
       <div className="scroll-content">
-        {!started ? (
+
+        {/* STATUT COURSE */}
+        {raceWaiting && !started && (
+          <div style={{ background: '#FFF3E0', border: '2px solid #F4A435', borderRadius: 16, padding: 16, textAlign: 'center' }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
+            <p style={{ fontSize: 15, fontWeight: 800, color: '#854F0B', marginBottom: 4 }}>En attente du top départ</p>
+            <p style={{ fontSize: 13, color: '#B47020', fontWeight: 600 }}>L'organisateur n'a pas encore lancé la course. Restez prêts !</p>
+          </div>
+        )}
+
+        {raceFinished && (
+          <div style={{ background: '#E0F8E0', border: '2px solid #4A7C59', borderRadius: 16, padding: 16, textAlign: 'center' }}>
+            <div style={{ fontSize: 28, marginBottom: 8 }}>🏁</div>
+            <p style={{ fontSize: 15, fontWeight: 800, color: '#1A4A1F' }}>La course est terminée !</p>
+          </div>
+        )}
+
+        {raceActive && !started && (
           <button className="btn-primary" onClick={handleStart} style={{ fontSize: 17 }}>
             🚀 Démarrer ma course !
           </button>
-        ) : (
+        )}
+
+        {started && (
           <div className="card-green">
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
               <div>
@@ -235,11 +262,13 @@ export default function MapScreen({ team, onOpenAdmin }) {
           </div>
         </div>
 
-        {!arrived ? (
+        {!arrived && started && (
           <button className="btn-dark" onClick={() => setShowArrivalConfirm(true)}>
             🏁 Je suis arrivé(e) !
           </button>
-        ) : (
+        )}
+
+        {arrived && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div className="card" style={{ background: '#E0F8E0', borderColor: '#A8D5B5', textAlign: 'center' }}>
               <div style={{ fontSize: 15, fontWeight: 800, color: '#1A4A1F' }}>
@@ -260,19 +289,15 @@ export default function MapScreen({ team, onOpenAdmin }) {
       </div>
 
       {showArrivalConfirm && (
-        <div className="modal-overlay">
-          <div className="modal-box">
-            <h3>🏁 Tu es bien arrivé(e) ?</h3>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, zIndex: 9999 }}>
+          <div style={{ background: '#FFFDF8', borderRadius: 20, padding: 24, width: '100%', maxWidth: 340, border: '3px solid #4A7C59' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, marginBottom: 10, color: '#2D5016' }}>🏁 Tu es bien arrivé(e) ?</h3>
             <p style={{ fontSize: 14, color: '#7A9060', marginBottom: 20, fontWeight: 600, lineHeight: 1.5 }}>
               Confirme ton arrivée ! Cette action sera enregistrée pour le classement final.
             </p>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn-primary" onClick={handleArrival}>
-                ✅ Confirmer l'arrivée !
-              </button>
-              <button className="btn-outline" onClick={() => setShowArrivalConfirm(false)}>
-                Annuler
-              </button>
+              <button className="btn-primary" onClick={handleArrival}>✅ Confirmer !</button>
+              <button className="btn-outline" onClick={() => setShowArrivalConfirm(false)}>Annuler</button>
             </div>
           </div>
         </div>
