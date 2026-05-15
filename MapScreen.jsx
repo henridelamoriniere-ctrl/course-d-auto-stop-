@@ -1,82 +1,105 @@
 import { useEffect, useRef, useState } from 'react'
-import { supabase, upsertLocation, getAllTeams, updateCarCount, setArrivalTime, getRaceConfig } from './supabase'
+import { supabase, upsertLocation, getAllTeams, updateCarCount, setArrivalTime, setDepartureTime, getRaceConfig } from './supabase'
 
-export default function MapScreen({ team, onCarCountChange }) {
+export default function MapScreen({ team, onOpenAdmin }) {
   const mapRef = useRef(null)
   const mapInstanceRef = useRef(null)
   const markersRef = useRef({})
   const watchIdRef = useRef(null)
   const wakeLockRef = useRef(null)
+  const timerRef = useRef(null)
+
   const [carCount, setCarCount] = useState(team.car_count || 0)
   const [elapsed, setElapsed] = useState('00:00')
   const [config, setConfig] = useState(null)
   const [myPos, setMyPos] = useState(null)
   const [arrived, setArrived] = useState(!!team.arrival_time)
+  const [started, setStarted] = useState(!!team.departure_time)
+  const [departureTime, setDepTime] = useState(team.departure_time || null)
+  const [showArrivalConfirm, setShowArrivalConfirm] = useState(false)
+  const [now, setNow] = useState(new Date())
 
-  // Keep screen awake
+  // Wake lock
   useEffect(() => {
     async function requestWakeLock() {
       try {
-        if ('wakeLock' in navigator) {
-          wakeLockRef.current = await navigator.wakeLock.request('screen')
-        }
+        if ('wakeLock' in navigator) wakeLockRef.current = await navigator.wakeLock.request('screen')
       } catch {}
     }
     requestWakeLock()
     return () => { if (wakeLockRef.current) wakeLockRef.current.release() }
   }, [])
 
-  // Load config
+  // Current time ticker
   useEffect(() => {
-    getRaceConfig().then(setConfig)
+    const t = setInterval(() => setNow(new Date()), 30000)
+    return () => clearInterval(t)
   }, [])
 
-  // Init map after config loaded
+  // Elapsed timer
   useEffect(() => {
-    if (!config || mapInstanceRef.current) return
+    if (!departureTime) return
+    function tick() {
+      const diff = Date.now() - new Date(departureTime).getTime()
+      const h = Math.floor(diff / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      if (h > 0) setElapsed(`${h}h${String(m).padStart(2,'0')}`)
+      else setElapsed(`${m} min`)
+    }
+    tick()
+    timerRef.current = setInterval(tick, 60000)
+    return () => clearInterval(timerRef.current)
+  }, [departureTime])
+
+  // Load config
+  useEffect(() => { getRaceConfig().then(setConfig) }, [])
+
+  // Init map
+  useEffect(() => {
+    if (mapInstanceRef.current) return
     import('leaflet').then(L => {
-      const map = L.default.map(mapRef.current, { zoomControl: true }).setView(
-        [config.start_lat, config.start_lng], 9
-      )
+      const map = L.default.map(mapRef.current, { zoomControl: true })
+        .setView([47.5, 2.0], 7)
+
       L.default.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap'
       }).addTo(map)
 
-      // Start marker
-      const startIcon = L.default.divIcon({
-        html: `<div style="background:#065f46;color:white;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.2)">🚩 ${config.start_location_name}</div>`,
-        className: '', iconAnchor: [0, 0]
-      })
-      L.default.marker([config.start_lat, config.start_lng], { icon: startIcon }).addTo(map)
-
-      // End marker
-      const endIcon = L.default.divIcon({
-        html: `<div style="background:#9a3412;color:white;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:600;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.2)">🏁 ${config.end_location_name}</div>`,
-        className: '', iconAnchor: [0, 0]
-      })
-      L.default.marker([config.end_lat, config.end_lng], { icon: endIcon }).addTo(map)
-
       mapInstanceRef.current = map
-      loadTeamMarkers(L.default, map)
+      loadAllMarkers(L.default, map)
     })
-  }, [config])
+  }, [])
 
-  async function loadTeamMarkers(L, map) {
+  async function loadAllMarkers(L, map) {
     const teams = await getAllTeams()
     const { data: locs } = await supabase.from('team_locations').select('*')
     const locMap = {}
     if (locs) locs.forEach(l => { locMap[l.team_id] = l })
+
+    // Start/end pins
+    if (config) {
+      const startIcon = L.divIcon({
+        html: `<div style="background:#2D5016;color:white;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:800;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.2)">🚩 ${config.start_location_name}</div>`,
+        className: '', iconAnchor: [0, 0]
+      })
+      L.marker([config.start_lat, config.start_lng], { icon: startIcon }).addTo(map)
+      const endIcon = L.divIcon({
+        html: `<div style="background:#D85A30;color:white;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:800;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.2)">🏁 ${config.end_location_name}</div>`,
+        className: '', iconAnchor: [0, 0]
+      })
+      L.marker([config.end_lat, config.end_lng], { icon: endIcon }).addTo(map)
+    }
 
     teams.forEach(t => {
       const loc = locMap[t.id]
       if (!loc) return
       const isMe = t.id === team.id
       const icon = L.divIcon({
-        html: `<div style="width:${isMe?34:28}px;height:${isMe?34:28}px;background:${t.color};border:${isMe?'3px':'2px'} solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:${isMe?13:11}px;box-shadow:0 2px 6px rgba(0,0,0,.3)">${t.name[0].toUpperCase()}</div>`,
-        className: '', iconSize: [isMe?34:28, isMe?34:28], iconAnchor: [isMe?17:14, isMe?17:14]
+        html: `<div style="width:${isMe?36:30}px;height:${isMe?36:30}px;background:${t.color};border:${isMe?'3px':'2px'} solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:${isMe?14:12}px;box-shadow:0 2px 8px rgba(0,0,0,.3)">${t.name[0].toUpperCase()}</div>`,
+        className: '', iconSize: [isMe?36:30, isMe?36:30], iconAnchor: [isMe?18:15, isMe?18:15]
       })
       const marker = L.marker([loc.lat, loc.lng], { icon }).addTo(map)
-      marker.bindPopup(`<b>${t.name}</b><br>${t.car_count} voitures`)
+      marker.bindPopup(`<b style="font-family:Nunito,sans-serif">${t.name}</b><br>${t.car_count} voitures`)
       markersRef.current[t.id] = marker
     })
   }
@@ -89,21 +112,25 @@ export default function MapScreen({ team, onCarCountChange }) {
         const { latitude: lat, longitude: lng } = pos.coords
         setMyPos({ lat, lng })
         await upsertLocation(team.id, lat, lng)
-        if (mapInstanceRef.current && markersRef.current[team.id]) {
+        if (mapInstanceRef.current) {
           import('leaflet').then(L => {
-            markersRef.current[team.id].setLatLng([lat, lng])
+            if (markersRef.current[team.id]) {
+              markersRef.current[team.id].setLatLng([lat, lng])
+            } else {
+              loadAllMarkers(L.default, mapInstanceRef.current)
+            }
           })
         }
       },
-      (err) => console.warn('GPS error:', err),
-      { enableHighAccuracy: true, maximumAge: 5000 }
+      (err) => console.warn('GPS:', err),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     )
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current) }
   }, [team.id])
 
   // Realtime other teams
   useEffect(() => {
-    const channel = supabase.channel('locations')
+    const channel = supabase.channel('map-locations')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'team_locations' },
         async (payload) => {
           if (!mapInstanceRef.current) return
@@ -112,8 +139,6 @@ export default function MapScreen({ team, onCarCountChange }) {
           import('leaflet').then(L => {
             if (markersRef.current[loc.team_id]) {
               markersRef.current[loc.team_id].setLatLng([loc.lat, loc.lng])
-            } else {
-              loadTeamMarkers(L.default, mapInstanceRef.current)
             }
           })
         })
@@ -121,98 +146,137 @@ export default function MapScreen({ team, onCarCountChange }) {
     return () => supabase.removeChannel(channel)
   }, [team.id])
 
-  // Elapsed timer
-  useEffect(() => {
-    if (!team.departure_time) return
-    const interval = setInterval(() => {
-      const diff = Date.now() - new Date(team.departure_time).getTime()
-      const h = Math.floor(diff / 3600000)
-      const m = Math.floor((diff % 3600000) / 60000)
-      setElapsed(`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`)
-    }, 10000)
-    return () => clearInterval(interval)
-  }, [team.departure_time])
+  async function handleStart() {
+    const now = new Date().toISOString()
+    await setDepartureTime(team.id)
+    setDepTime(now)
+    setStarted(true)
+  }
 
   async function handleCarChange(delta) {
     const newCount = Math.max(0, carCount + delta)
     setCarCount(newCount)
     await updateCarCount(team.id, newCount)
-    onCarCountChange?.(newCount)
   }
 
   async function handleArrival() {
-    if (arrived) return
     await setArrivalTime(team.id)
     setArrived(true)
+    setShowArrivalConfirm(false)
   }
+
+  async function handleCancelArrival() {
+    await supabase.from('teams').update({ arrival_time: null }).eq('id', team.id)
+    setArrived(false)
+  }
+
+  const depTimeStr = departureTime
+    ? new Date(departureTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    : null
+  const nowStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
   return (
     <>
-      <div className="hdr">
+      <div className="hdr hdr-green">
         <div>
           <div className="hdr-sub">Position en direct</div>
           <div className="hdr-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: team.color, flexShrink: 0 }} />
+            <div style={{ width: 12, height: 12, borderRadius: '50%', background: team.color, flexShrink: 0, border: '2px solid white' }} />
             {team.name}
           </div>
         </div>
-        <span className="live-dot">En direct</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span className="live-badge">En direct</span>
+          <button onClick={onOpenAdmin}
+            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 10, padding: '6px 10px', color: 'white', cursor: 'pointer', fontSize: 18 }}>
+            ⚙️
+          </button>
+        </div>
       </div>
 
-      <div id="map" ref={mapRef} style={{ height: 280 }} />
+      <div id="map" ref={mapRef} style={{ height: 240 }} />
 
       <div className="scroll-content">
-        {/* Car counter */}
-        <div className="card">
-          <div style={{ fontSize: 12, color: '#888', marginBottom: 10 }}>Voitures empruntées</div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 48, fontWeight: 700, lineHeight: 1 }}>{carCount}</span>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={() => handleCarChange(-1)} className="btn-outline"
-                style={{ width: 40, height: 40, padding: 0, fontSize: 20, borderRadius: '50%', display:'flex', alignItems:'center', justifyContent:'center' }}>−</button>
-              <button onClick={() => handleCarChange(1)}
-                style={{ width: 40, height: 40, padding: 0, fontSize: 20, borderRadius: '50%', background: '#EF9F27', color: '#fff', border: 'none', cursor: 'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontSize: 22 }}>+</button>
-            </div>
-          </div>
-        </div>
-
-        {/* Times */}
-        <div className="grid-2">
-          <div className="card">
-            <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Départ</div>
-            <div style={{ fontSize: 18, fontWeight: 600 }}>
-              {team.departure_time
-                ? new Date(team.departure_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-                : '--:--'}
-            </div>
-          </div>
-          <div className="card">
-            <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>Temps écoulé</div>
-            <div style={{ fontSize: 18, fontWeight: 600 }}>{elapsed}</div>
-          </div>
-        </div>
-
-        {/* Arrival */}
-        {!arrived ? (
-          <button className="btn-primary" onClick={handleArrival}
-            style={{ background: '#065f46' }}>
-            🏁 Je suis arrivé(e) !
+        {!started ? (
+          <button className="btn-primary" onClick={handleStart} style={{ fontSize: 17 }}>
+            🚀 Démarrer ma course !
           </button>
         ) : (
-          <div className="card" style={{ textAlign: 'center', background: '#d1fae5' }}>
-            <div style={{ fontSize: 15, fontWeight: 600, color: '#065f46' }}>
-              🏁 Arrivée enregistrée à {new Date(team.arrival_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+          <div className="card-green">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 700, marginBottom: 3 }}>DÉPART</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'white' }}>{depTimeStr}</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 700, marginBottom: 3 }}>EN ROUTE</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: '#F4A435' }}>{elapsed}</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 700, marginBottom: 3 }}>MAINTENANT</div>
+                <div style={{ fontSize: 18, fontWeight: 800, color: 'white' }}>{nowStr}</div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* GPS status */}
+        <div className="card">
+          <div style={{ fontSize: 11, color: '#8B7355', fontWeight: 800, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            🚗 Voitures empruntées
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 52, fontWeight: 800, color: '#2D5016', lineHeight: 1 }}>{carCount}</span>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => handleCarChange(-1)}
+                style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid #E8D5B0', background: '#FFFDF8', cursor: 'pointer', fontSize: 22, fontWeight: 800, color: '#5A7040', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+              <button onClick={() => handleCarChange(1)}
+                style={{ width: 44, height: 44, borderRadius: '50%', background: '#F4A435', border: 'none', cursor: 'pointer', fontSize: 22, fontWeight: 800, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+            </div>
+          </div>
+        </div>
+
+        {!arrived ? (
+          <button className="btn-dark" onClick={() => setShowArrivalConfirm(true)}>
+            🏁 Je suis arrivé(e) !
+          </button>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div className="card" style={{ background: '#E0F8E0', borderColor: '#A8D5B5', textAlign: 'center' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#1A4A1F' }}>
+                🏁 Arrivée à {team.arrival_time ? new Date(team.arrival_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
+              </div>
+            </div>
+            <button className="btn-outline" onClick={handleCancelArrival} style={{ fontSize: 13 }}>
+              ↩ Annuler l'arrivée (erreur ?)
+            </button>
+          </div>
+        )}
+
         {myPos && (
-          <p style={{ fontSize: 11, color: '#bbb', textAlign: 'center' }}>
+          <p style={{ fontSize: 11, color: '#B4A090', textAlign: 'center', fontWeight: 600 }}>
             📍 GPS actif · {myPos.lat.toFixed(4)}, {myPos.lng.toFixed(4)}
           </p>
         )}
       </div>
+
+      {showArrivalConfirm && (
+        <div className="modal-overlay">
+          <div className="modal-box">
+            <h3>🏁 Tu es bien arrivé(e) ?</h3>
+            <p style={{ fontSize: 14, color: '#7A9060', marginBottom: 20, fontWeight: 600, lineHeight: 1.5 }}>
+              Confirme ton arrivée ! Cette action sera enregistrée pour le classement final.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button className="btn-primary" onClick={handleArrival}>
+                ✅ Confirmer l'arrivée !
+              </button>
+              <button className="btn-outline" onClick={() => setShowArrivalConfirm(false)}>
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
