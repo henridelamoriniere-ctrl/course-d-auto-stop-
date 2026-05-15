@@ -260,6 +260,21 @@ export default function MapScreen({ team, onOpenAdmin }) {
           </div>
         )}
 
+        {config && (
+  <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+    <div>
+      <div style={{ fontSize: 11, color: '#8B7355', fontWeight: 800, marginBottom: 3, textTransform: 'uppercase', letterSpacing: '0.5px' }}>🏁 Destination</div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: '#2D5016' }}>{config.end_location_name}</div>
+    </div>
+    
+      href={`https://www.google.com/maps/dir/?api=1&destination=${config.end_lat},${config.end_lng}`}
+      target="_blank"
+      rel="noreferrer"
+      style={{ background: '#4A7C59', color: 'white', padding: '8px 14px', borderRadius: 10, fontSize: 12, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+      Google Maps →
+    </a>
+  </div>
+)}
         {myPos && (
           <p style={{ fontSize: 11, color: '#B4A090', textAlign: 'center', fontWeight: 600 }}>
             📍 GPS actif · {myPos.lat.toFixed(4)}, {myPos.lng.toFixed(4)}
