@@ -68,8 +68,9 @@ export default function App() {
     setScreen('map')
   }
 
-  if (!team) {
-    return (
+if (checking) return <div className="app" style={{display:'flex',alignItems:'center',justifyContent:'center',fontSize:32}}>🚗</div>
+
+  if (!team) {    return (
       <div className="app">
         <LoginScreen onLogin={handleLogin} />
       </div>
