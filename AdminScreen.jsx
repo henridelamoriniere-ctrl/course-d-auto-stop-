@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   getAllChallenges, upsertChallenge, deleteChallenge,
   getAllTeams, getAllCompletions, validateCompletion,
-  getRaceConfig, updateRaceConfig, sendMessage, getLeaderboard
+  getRaceConfig, updateRaceConfig, sendMessage, supabase
 } from './supabase'
 
 export default function AdminScreen({ onLogout }) {
@@ -14,6 +14,7 @@ export default function AdminScreen({ onLogout }) {
   const [editingChallenge, setEditingChallenge] = useState(null)
   const [announcement, setAnnouncement] = useState('')
   const [saving, setSaving] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   useEffect(() => { loadAll() }, [])
 
@@ -46,6 +47,26 @@ export default function AdminScreen({ onLogout }) {
     await updateRaceConfig({ status: 'finished' })
     await sendMessage('Orga 🏁', '#4A7C59', '🏁 La course est terminée ! Bravo à tous les participants !', 'announcement')
     setConfig(prev => ({ ...prev, status: 'finished' }))
+  }
+
+  async function handleResetAll() {
+    if (!confirm('⚠️ ATTENTION ! Remettre à zéro TOUTES les données ?\n\nÉquipes, photos, messages, positions GPS...\n\nCette action est IRRÉVERSIBLE !')) return
+    if (!confirm('Dernière confirmation : effacer toutes les données de la course ?')) return
+    setResetting(true)
+    try {
+      await supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('challenge_completions').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('team_locations').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('teams').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await updateRaceConfig({ status: 'waiting', started_at: null })
+      setConfig(prev => ({ ...prev, status: 'waiting', started_at: null }))
+      setTeams([])
+      setPending([])
+      alert('✅ App remise à zéro ! Tout est prêt pour une nouvelle course.')
+    } catch (e) {
+      alert('Erreur lors de la remise à zéro. Réessaie.')
+    }
+    setResetting(false)
   }
 
   async function handleValidate(id, approved) {
@@ -122,7 +143,9 @@ export default function AdminScreen({ onLogout }) {
                 <button className="btn-green" onClick={handleStartRace}>🚀 Lancer la course !</button>
               )}
               {config.status === 'active' && (
-                <button className="btn-danger" onClick={handleStopRace} style={{ width: '100%', padding: 12, fontSize: 14 }}>🏁 Terminer la course</button>
+                <button style={{ width: '100%', padding: 12, fontSize: 14, background: '#FDECEA', color: '#D85A30', border: '2px solid #F5C4B3', borderRadius: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }} onClick={handleStopRace}>
+                  🏁 Terminer la course
+                </button>
               )}
               {config.status === 'finished' && (
                 <div style={{ padding: 14, background: '#E0F8E0', borderRadius: 12, textAlign: 'center', fontSize: 14, fontWeight: 800, color: '#1A4A1F' }}>
@@ -159,8 +182,21 @@ export default function AdminScreen({ onLogout }) {
             </div>
 
             <button className="btn-primary" onClick={handleSaveConfig} disabled={saving}>
-              {saving ? 'Sauvegarde...' : '💾 Sauvegarder la configuration'}
+              {saving ? '⏳ Sauvegarde...' : '💾 Sauvegarder la configuration'}
             </button>
+
+            <div style={{ marginTop: 8, padding: 16, background: '#FDECEA', border: '2px solid #F5C4B3', borderRadius: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: '#993C1D', marginBottom: 8 }}>⚠️ Zone dangereuse</div>
+              <p style={{ fontSize: 12, color: '#D85A30', fontWeight: 600, marginBottom: 12, lineHeight: 1.5 }}>
+                Remet l'app à zéro : supprime toutes les équipes, messages, photos et positions GPS. À utiliser avant le jour J pour repartir de zéro.
+              </p>
+              <button
+                onClick={handleResetAll}
+                disabled={resetting}
+                style={{ width: '100%', padding: 12, background: '#D85A30', color: 'white', border: 'none', borderRadius: 12, fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }}>
+                {resetting ? '⏳ Remise à zéro...' : '🗑️ Remettre l\'app à zéro'}
+              </button>
+            </div>
           </>
         )}
 
@@ -209,7 +245,7 @@ export default function AdminScreen({ onLogout }) {
                   <button className="btn-green" onClick={() => handleValidate(comp.id, true)} style={{ flex: 1, padding: 12, fontSize: 14 }}>
                     ✅ Valider
                   </button>
-                  <button className="btn-danger" onClick={() => handleValidate(comp.id, false)} style={{ flex: 1, padding: 12, fontSize: 14 }}>
+                  <button style={{ flex: 1, padding: 12, fontSize: 14, background: '#FDECEA', color: '#D85A30', border: '2px solid #F5C4B3', borderRadius: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'Nunito, sans-serif' }} onClick={() => handleValidate(comp.id, false)}>
                     ❌ Refuser
                   </button>
                 </div>
@@ -278,7 +314,7 @@ export default function AdminScreen({ onLogout }) {
                     <button className="btn-outline" style={{ fontSize: 11, padding: '5px 8px', color: ch.active ? '#D85A30' : '#4A7C59', borderColor: ch.active ? '#F5C4B3' : '#A8D5B5' }} onClick={() => handleToggleChallenge(ch)}>
                       {ch.active ? 'OFF' : 'ON'}
                     </button>
-                    <button className="btn-danger" style={{ padding: '5px 8px', fontSize: 11 }} onClick={() => handleDeleteChallenge(ch.id)}>✕</button>
+                    <button style={{ padding: '5px 8px', fontSize: 11, background: '#FDECEA', color: '#D85A30', border: '2px solid #F5C4B3', borderRadius: 8, fontWeight: 700, cursor: 'pointer' }} onClick={() => handleDeleteChallenge(ch.id)}>✕</button>
                   </div>
                 </div>
               </div>
@@ -302,7 +338,7 @@ export default function AdminScreen({ onLogout }) {
                   <p style={{ fontSize: 12, color: '#8B7355', fontWeight: 600, marginTop: 2 }}>
                     🚗 {t.car_count} voitures
                     {t.departure_time && ` · Départ ${new Date(t.departure_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
-                    {t.arrival_time && <span style={{ color: '#2D5016', fontWeight: 800 }}> · 🏁 Arrivée {new Date(t.arrival_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>}
+                    {t.arrival_time && <span style={{ color: '#2D5016', fontWeight: 800 }}> · 🏁 {new Date(t.arrival_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>}
                   </p>
                 </div>
               </div>
