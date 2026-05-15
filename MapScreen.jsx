@@ -127,7 +127,7 @@ export default function MapScreen({ team, onOpenAdmin }) {
         }
       },
       (err) => console.warn('GPS:', err),
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
     )
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current) }
   }, [team.id])
