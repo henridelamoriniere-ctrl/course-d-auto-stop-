@@ -8,6 +8,7 @@ export default function MapScreen({ team, onOpenAdmin }) {
   const watchIdRef = useRef(null)
   const wakeLockRef = useRef(null)
   const timerRef = useRef(null)
+  const teamRef = useRef(team)
 
   const [carCount, setCarCount] = useState(team.car_count || 0)
   const [elapsed, setElapsed] = useState('00:00')
@@ -19,7 +20,8 @@ export default function MapScreen({ team, onOpenAdmin }) {
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false)
   const [now, setNow] = useState(new Date())
 
-  // Wake lock
+  useEffect(() => { teamRef.current = team }, [team])
+
   useEffect(() => {
     async function requestWakeLock() {
       try {
@@ -30,13 +32,11 @@ export default function MapScreen({ team, onOpenAdmin }) {
     return () => { if (wakeLockRef.current) wakeLockRef.current.release() }
   }, [])
 
-  // Current time ticker
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 30000)
     return () => clearInterval(t)
   }, [])
 
-  // Elapsed timer
   useEffect(() => {
     if (!departureTime) return
     function tick() {
@@ -51,7 +51,6 @@ export default function MapScreen({ team, onOpenAdmin }) {
     return () => clearInterval(timerRef.current)
   }, [departureTime])
 
-  // Load config + realtime update when admin changes race status
   useEffect(() => {
     getRaceConfig().then(setConfig)
     const channel = supabase.channel('race-config-watch')
@@ -61,7 +60,6 @@ export default function MapScreen({ team, onOpenAdmin }) {
     return () => supabase.removeChannel(channel)
   }, [])
 
-  // Init map
   useEffect(() => {
     if (mapInstanceRef.current) return
     import('leaflet').then(L => {
@@ -81,65 +79,55 @@ export default function MapScreen({ team, onOpenAdmin }) {
     const locMap = {}
     if (locs) locs.forEach(l => { locMap[l.team_id] = l })
 
-    if (config) {
-      const startIcon = L.divIcon({
-        html: `<div style="background:#2D5016;color:white;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:800;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.2)">🚩 ${config.start_location_name}</div>`,
-        className: '', iconAnchor: [0, 0]
-      })
-      L.marker([config.start_lat, config.start_lng], { icon: startIcon }).addTo(map)
-      const endIcon = L.divIcon({
-        html: `<div style="background:#D85A30;color:white;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:800;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.2)">🏁 ${config.end_location_name}</div>`,
-        className: '', iconAnchor: [0, 0]
-      })
-      L.marker([config.end_lat, config.end_lng], { icon: endIcon }).addTo(map)
-    }
-
     teams.forEach(t => {
       const loc = locMap[t.id]
       if (!loc) return
-      const isMe = t.id === team.id
+      const isMe = t.id === teamRef.current.id
       const icon = L.divIcon({
         html: `<div style="width:${isMe?36:30}px;height:${isMe?36:30}px;background:${t.color};border:${isMe?'3px':'2px'} solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:${isMe?14:12}px;box-shadow:0 2px 8px rgba(0,0,0,.3)">${t.name[0].toUpperCase()}</div>`,
         className: '', iconSize: [isMe?36:30, isMe?36:30], iconAnchor: [isMe?18:15, isMe?18:15]
       })
       const marker = L.marker([loc.lat, loc.lng], { icon }).addTo(map)
-      marker.bindPopup(`<b style="font-family:Nunito,sans-serif">${t.name}</b><br>${t.car_count} voitures`)
+      marker.bindPopup(`<b>${t.name}</b><br>${t.car_count} voitures`)
       markersRef.current[t.id] = marker
     })
   }
 
-  // GPS tracking
   useEffect(() => {
     if (!navigator.geolocation) return
     watchIdRef.current = navigator.geolocation.watchPosition(
       async (pos) => {
         const { latitude: lat, longitude: lng } = pos.coords
         setMyPos({ lat, lng })
-        await upsertLocation(team.id, lat, lng)
-        if (mapInstanceRef.current) {
-          import('leaflet').then(L => {
-            if (markersRef.current[team.id]) {
-              markersRef.current[team.id].setLatLng([lat, lng])
-            } else {
-              loadAllMarkers(L.default, mapInstanceRef.current)
-            }
-          })
-        }
+        const t = teamRef.current
+        await upsertLocation(t.id, lat, lng)
+        import('leaflet').then(L => {
+          if (!mapInstanceRef.current) return
+          if (markersRef.current[t.id]) {
+            markersRef.current[t.id].setLatLng([lat, lng])
+          } else {
+            const icon = L.default.divIcon({
+              html: `<div style="width:36px;height:36px;background:${t.color};border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3)">${t.name[0].toUpperCase()}</div>`,
+              className: '', iconSize: [36, 36], iconAnchor: [18, 18]
+            })
+            markersRef.current[t.id] = L.default.marker([lat, lng], { icon }).addTo(mapInstanceRef.current)
+            mapInstanceRef.current.setView([lat, lng], 10)
+          }
+        })
       },
       (err) => console.warn('GPS:', err),
       { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
     )
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current) }
-  }, [team.id])
+  }, [])
 
-  // Realtime other teams positions
   useEffect(() => {
     const channel = supabase.channel('map-locations')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'team_locations' },
         async (payload) => {
           if (!mapInstanceRef.current) return
           const loc = payload.new
-          if (loc.team_id === team.id) return
+          if (loc.team_id === teamRef.current.id) return
           import('leaflet').then(L => {
             if (markersRef.current[loc.team_id]) {
               markersRef.current[loc.team_id].setLatLng([loc.lat, loc.lng])
@@ -148,11 +136,11 @@ export default function MapScreen({ team, onOpenAdmin }) {
         })
       .subscribe()
     return () => supabase.removeChannel(channel)
-  }, [team.id])
+  }, [])
 
   async function handleStart() {
     const t = new Date().toISOString()
-    await setDepartureTime(team.id)
+    await setDepartureTime(teamRef.current.id)
     setDepTime(t)
     setStarted(true)
   }
@@ -160,27 +148,24 @@ export default function MapScreen({ team, onOpenAdmin }) {
   async function handleCarChange(delta) {
     const newCount = Math.max(0, carCount + delta)
     setCarCount(newCount)
-    await updateCarCount(team.id, newCount)
+    await updateCarCount(teamRef.current.id, newCount)
   }
 
   async function handleArrival() {
-    await setArrivalTime(team.id)
+    await setArrivalTime(teamRef.current.id)
     setArrived(true)
     setShowArrivalConfirm(false)
   }
 
   async function handleCancelArrival() {
-    await supabase.from('teams').update({ arrival_time: null }).eq('id', team.id)
+    await supabase.from('teams').update({ arrival_time: null }).eq('id', teamRef.current.id)
     setArrived(false)
   }
 
   const raceActive = config?.status === 'active'
   const raceWaiting = config?.status === 'waiting' || !config?.status
   const raceFinished = config?.status === 'finished'
-
-  const depTimeStr = departureTime
-    ? new Date(departureTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
-    : null
+  const depTimeStr = departureTime ? new Date(departureTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : null
   const nowStr = now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
   return (
@@ -195,10 +180,7 @@ export default function MapScreen({ team, onOpenAdmin }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span className="live-badge">En direct</span>
-          <button onClick={onOpenAdmin}
-            style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 10, padding: '6px 10px', color: 'white', cursor: 'pointer', fontSize: 18 }}>
-            ⚙️
-          </button>
+          <button onClick={onOpenAdmin} style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: 10, padding: '6px 10px', color: 'white', cursor: 'pointer', fontSize: 18 }}>⚙️</button>
         </div>
       </div>
 
@@ -206,7 +188,6 @@ export default function MapScreen({ team, onOpenAdmin }) {
 
       <div className="scroll-content">
 
-        {/* STATUT COURSE */}
         {raceWaiting && !started && (
           <div style={{ background: '#FFF3E0', border: '2px solid #F4A435', borderRadius: 16, padding: 16, textAlign: 'center' }}>
             <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
@@ -254,10 +235,8 @@ export default function MapScreen({ team, onOpenAdmin }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <span style={{ fontSize: 52, fontWeight: 800, color: '#2D5016', lineHeight: 1 }}>{carCount}</span>
             <div style={{ display: 'flex', gap: 10 }}>
-              <button onClick={() => handleCarChange(-1)}
-                style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid #E8D5B0', background: '#FFFDF8', cursor: 'pointer', fontSize: 22, fontWeight: 800, color: '#5A7040', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
-              <button onClick={() => handleCarChange(1)}
-                style={{ width: 44, height: 44, borderRadius: '50%', background: '#F4A435', border: 'none', cursor: 'pointer', fontSize: 22, fontWeight: 800, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+              <button onClick={() => handleCarChange(-1)} style={{ width: 44, height: 44, borderRadius: '50%', border: '2px solid #E8D5B0', background: '#FFFDF8', cursor: 'pointer', fontSize: 22, fontWeight: 800, color: '#5A7040', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>−</button>
+              <button onClick={() => handleCarChange(1)} style={{ width: 44, height: 44, borderRadius: '50%', background: '#F4A435', border: 'none', cursor: 'pointer', fontSize: 22, fontWeight: 800, color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
             </div>
           </div>
         </div>
@@ -275,9 +254,7 @@ export default function MapScreen({ team, onOpenAdmin }) {
                 🏁 Arrivée à {team.arrival_time ? new Date(team.arrival_time).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '--:--'}
               </div>
             </div>
-            <button className="btn-outline" onClick={handleCancelArrival} style={{ fontSize: 13 }}>
-              ↩ Annuler l'arrivée (erreur ?)
-            </button>
+            <button className="btn-outline" onClick={handleCancelArrival} style={{ fontSize: 13 }}>↩ Annuler l'arrivée (erreur ?)</button>
           </div>
         )}
 
