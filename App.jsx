@@ -12,7 +12,7 @@ const STORAGE_KEY = 'hitchrace_team'
 const ADMIN_STORAGE_KEY = 'hitchrace_admin'
 
 export default function App() {
- const [team, setTeam] = useState(null)
+  const [team, setTeam] = useState(null)
   const [checking, setChecking] = useState(true)
 
   useEffect(() => {
@@ -28,6 +28,7 @@ export default function App() {
     }
     checkTeam()
   }, [])
+
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem(ADMIN_STORAGE_KEY) === 'true')
   const [screen, setScreen] = useState('map')
   const [showAdminLogin, setShowAdminLogin] = useState(false)
@@ -68,24 +69,21 @@ export default function App() {
     setScreen('map')
   }
 
-if (checking) return <div className="app" style={{display:'flex',alignItems:'center',justifyContent:'center',fontSize:32}}>🚗</div>
+  if (checking) return <div className="app" style={{display:'flex',alignItems:'center',justifyContent:'center',fontSize:32}}>🚗</div>
 
-  if (!team) {    return (
+  if (!team) {
+    return (
       <div className="app">
         <LoginScreen onLogin={handleLogin} />
       </div>
     )
   }
 
-return (
+  return (
     <div className="app">
       <div style={{ textAlign: 'center', padding: '6px 16px', background: '#F4A435', color: 'white', fontSize: 13, fontWeight: 800, letterSpacing: '0.3px', flexShrink: 0 }}>
         🌻 Ça va pas être triste !
       </div>
-      {isAdmin && screen === 'admin' ? (
- 
-  return (
-    <div className="app">
       {isAdmin && screen === 'admin' ? (
         <AdminScreen onLogout={handleAdminLogout} />
       ) : (
@@ -104,9 +102,7 @@ return (
           </div>
         </>
       )}
-
       <BottomNav current={screen} onChange={setScreen} isAdmin={isAdmin} />
-
       {showAdminLogin && (
         <div style={{
           position: 'fixed', inset: 0,
@@ -138,4 +134,3 @@ return (
     </div>
   )
 }
-
