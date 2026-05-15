@@ -151,8 +151,10 @@ export default function MapScreen({ team, onOpenAdmin }) {
     await updateCarCount(teamRef.current.id, newCount)
   }
 
-  async function handleArrival() {
+ async function handleArrival() {
+    const arrivalTime = new Date().toISOString()
     await setArrivalTime(teamRef.current.id)
+    team.arrival_time = arrivalTime
     setArrived(true)
     setShowArrivalConfirm(false)
   }
