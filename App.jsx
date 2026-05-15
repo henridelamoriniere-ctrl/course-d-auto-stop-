@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { getRaceConfig, supabase } from './supabase'
 import LoginScreen from './LoginScreen'
 import MapScreen from './MapScreen'
