@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getRaceConfig } from './supabase'
+import { getRaceConfig, supabase } from './supabase'
 import LoginScreen from './LoginScreen'
 import MapScreen from './MapScreen'
 import ChallengesScreen from './ChallengesScreen'
