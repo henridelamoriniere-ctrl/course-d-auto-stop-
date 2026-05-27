@@ -19,6 +19,7 @@ export default function MapScreen({ team, onOpenAdmin }) {
   const [departureTime, setDepTime] = useState(team.departure_time || null)
   const [showArrivalConfirm, setShowArrivalConfirm] = useState(false)
   const [now, setNow] = useState(new Date())
+  const [gpsStatus, setGpsStatus] = useState('idle') // 'idle', 'requesting', 'active', 'denied', 'error'
 
   useEffect(() => { teamRef.current = team }, [team])
 
@@ -92,31 +93,49 @@ export default function MapScreen({ team, onOpenAdmin }) {
     })
   }
 
-  useEffect(() => {
-    if (!navigator.geolocation) return
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      async (pos) => {
-        const { latitude: lat, longitude: lng } = pos.coords
-        setMyPos({ lat, lng })
-        const t = teamRef.current
-        await upsertLocation(t.id, lat, lng)
-        import('leaflet').then(L => {
-          if (!mapInstanceRef.current) return
-          if (markersRef.current[t.id]) {
-            markersRef.current[t.id].setLatLng([lat, lng])
-          } else {
-            const icon = L.default.divIcon({
-              html: `<div style="width:36px;height:36px;background:${t.color};border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3)">${t.name[0].toUpperCase()}</div>`,
-              className: '', iconSize: [36, 36], iconAnchor: [18, 18]
+  function startGPS() {
+    if (!navigator.geolocation) {
+      setGpsStatus('error')
+      return
+    }
+    setGpsStatus('requesting')
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        setGpsStatus('active')
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          async (pos) => {
+            const { latitude: lat, longitude: lng } = pos.coords
+            setMyPos({ lat, lng })
+            const t = teamRef.current
+            await upsertLocation(t.id, lat, lng)
+            import('leaflet').then(L => {
+              if (!mapInstanceRef.current) return
+              if (markersRef.current[t.id]) {
+                markersRef.current[t.id].setLatLng([lat, lng])
+              } else {
+                const icon = L.default.divIcon({
+                  html: `<div style="width:36px;height:36px;background:${t.color};border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3)">${t.name[0].toUpperCase()}</div>`,
+                  className: '', iconSize: [36, 36], iconAnchor: [18, 18]
+                })
+                markersRef.current[t.id] = L.default.marker([lat, lng], { icon }).addTo(mapInstanceRef.current)
+                mapInstanceRef.current.setView([lat, lng], 10)
+              }
             })
-            markersRef.current[t.id] = L.default.marker([lat, lng], { icon }).addTo(mapInstanceRef.current)
-            mapInstanceRef.current.setView([lat, lng], 10)
-          }
-        })
+          },
+          (err) => { console.warn('GPS watch:', err); setGpsStatus('error') },
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
+        )
       },
-      (err) => console.warn('GPS:', err),
-      { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
+      (err) => {
+        console.warn('GPS permission:', err)
+        setGpsStatus('denied')
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 }
     )
+  }
+
+  useEffect(() => {
+    startGPS()
     return () => { if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current) }
   }, [])
 
@@ -188,6 +207,44 @@ export default function MapScreen({ team, onOpenAdmin }) {
       <div id="map" ref={mapRef} style={{ height: 240 }} />
 
       <div className="scroll-content">
+
+        {gpsStatus === 'idle' && (
+          <button onClick={startGPS} style={{ background: '#4A7C59', color: 'white', border: 'none', borderRadius: 12, padding: '12px 16px', fontSize: 15, fontWeight: 700, cursor: 'pointer', width: '100%' }}>
+            📍 Activer ma localisation
+          </button>
+        )}
+
+        {gpsStatus === 'requesting' && (
+          <div style={{ background: '#FFF3E0', border: '2px solid #F4A435', borderRadius: 12, padding: 12, textAlign: 'center' }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#854F0B' }}>📍 Autorisation en cours...</p>
+            <p style={{ fontSize: 12, color: '#B47020', marginTop: 4 }}>Accepte la demande de localisation sur ton téléphone</p>
+          </div>
+        )}
+
+        {gpsStatus === 'denied' && (
+          <div style={{ background: '#FFF0F0', border: '2px solid #E57373', borderRadius: 12, padding: 12 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#C62828', marginBottom: 6 }}>❌ Localisation refusée</p>
+            <p style={{ fontSize: 12, color: '#B71C1C', marginBottom: 10, lineHeight: 1.5 }}>Va dans Réglages {'>'} Safari (ou Chrome) {'>'} Localisation et autorise ce site. Puis recharge la page.</p>
+            <button onClick={startGPS} style={{ background: '#E57373', color: 'white', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              Réessayer
+            </button>
+          </div>
+        )}
+
+        {gpsStatus === 'error' && (
+          <div style={{ background: '#FFF3E0', border: '2px solid #F4A435', borderRadius: 12, padding: 12 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, color: '#854F0B', marginBottom: 6 }}>⚠️ GPS indisponible</p>
+            <button onClick={startGPS} style={{ background: '#F4A435', color: 'white', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+              Réessayer
+            </button>
+          </div>
+        )}
+
+        {gpsStatus === 'active' && myPos && (
+          <p style={{ fontSize: 11, color: '#4A7C59', textAlign: 'center', fontWeight: 700 }}>
+            📍 GPS actif · {myPos.lat.toFixed(4)}, {myPos.lng.toFixed(4)}
+          </p>
+        )}
 
         {raceWaiting && !started && (
           <div style={{ background: '#FFF3E0', border: '2px solid #F4A435', borderRadius: 16, padding: 16, textAlign: 'center' }}>
@@ -271,11 +328,6 @@ export default function MapScreen({ team, onOpenAdmin }) {
           </div>
         )}
 
-        {myPos && (
-          <p style={{ fontSize: 11, color: '#B4A090', textAlign: 'center', fontWeight: 600 }}>
-            📍 GPS actif · {myPos.lat.toFixed(4)}, {myPos.lng.toFixed(4)}
-          </p>
-        )}
       </div>
 
       {showArrivalConfirm && (
